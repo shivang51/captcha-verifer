@@ -36,20 +36,20 @@ class MainFrame(wx.Frame):
 
         self._bind_events_()
 
-    def __del__(self):
-        self.registered_frame.Destroy()
-
     def _bind_events_(self):
         self.Bind(wx.EVT_BUTTON, self.on_submit_click, self.button_submit)
         self.Bind(wx.EVT_BUTTON, self.on_refresh_captcha_click, self.button_refresh_captcha)
+        self.Bind(wx.EVT_BUTTON, self.on_audio_captcha_click, self.button_audio_captcha)
         self.tb_name.Bind(wx.EVT_TEXT, self.on_input_name_change)
         self.tb_email.Bind(wx.EVT_TEXT, self.on_input_email_change)
         self.tb_password.Bind(wx.EVT_TEXT, self.on_input_password_change)
         self.tb_c_password.Bind(wx.EVT_TEXT, self.on_input_c_password_change)
+        self.Bind(wx.EVT_CLOSE, self.on_exit )
 
     def _init_assets_(self):
         self._assets_ = {
-            "refresh_icon_64x64":  os.path.join("../assets/images", "icons-refresh-64.png")
+            "refresh_icon_64x64": os.path.join("../assets/images", "icons-refresh-64.png"),
+            "audio_icon_50x50": os.path.join("../assets/images", "icons-audio-50.png")
         }
 
     def _init_ui_(self):
@@ -94,10 +94,6 @@ class MainFrame(wx.Frame):
         self.tb_c_password = wx.TextCtrl(panel, style=wx.TE_PASSWORD)
         self.tb_c_password.SetMinSize((250, 24))
 
-        # ============= Captcha Refresh Button ======
-        png = self._png_to_bitmap_(self._assets_["refresh_icon_64x64"], size=(24, 24))
-        self.button_refresh_captcha = wx.BitmapButton(panel, -1, png)
-
         # ============= Captcha Image ===============
         png = self._captcha_.random()
         self.image_captcha = wx.StaticBitmap(panel, -1, png)
@@ -112,6 +108,14 @@ class MainFrame(wx.Frame):
         self.button_submit = wx.Button(panel, label='Submit', size=(70, 26))
         self.button_submit.Disable()
         self.label_warn_submit = self._create_warn_label_(panel)
+
+        # ============= Captcha Refresh Button ======
+        png = self._png_to_bitmap_(self._assets_["refresh_icon_64x64"], size=(24, 24))
+        self.button_refresh_captcha = wx.BitmapButton(panel, -1, png)
+
+        # ============= Captcha Refresh Button ======
+        png = self._png_to_bitmap_(self._assets_["audio_icon_50x50"], size=(24, 24))
+        self.button_audio_captcha = wx.BitmapButton(panel, -1, png)
 
     def _assemble_ui_elements_(self) -> None:
         """
@@ -147,11 +151,17 @@ class MainFrame(wx.Frame):
 
         # ___________________________________
 
+        # ======================= Captcha Control Button ===================
+        self.captcha_controls_sizer = wx.BoxSizer(wx.VERTICAL)
+        self.captcha_controls_sizer.Add(self.button_audio_captcha, flag=wx.ALIGN_RIGHT)
+        self.captcha_controls_sizer.Add((-1, 2))
+        self.captcha_controls_sizer.Add(self.button_refresh_captcha, flag=wx.ALIGN_RIGHT)
+
         # ======================= Captcha Image ============================
         self.image_captcha_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.image_captcha_sizer.Add(self.button_refresh_captcha, flag=wx.ALIGN_BOTTOM | wx.LEFT)
+        self.image_captcha_sizer.Add(self.captcha_controls_sizer, flag=wx.ALIGN_BOTTOM | wx.LEFT)
         self.image_captcha_sizer.Add((5, -1))
-        self.image_captcha_sizer.Add(self.image_captcha, flag=wx.RIGHT)
+        self.image_captcha_sizer.Add(self.image_captcha, flag=wx.ALIGN_CENTER | wx.RIGHT)
         self.main_sizer.Add(self.image_captcha_sizer, flag=wx.CENTER | wx.BOTTOM, border=10)
 
         # ======================= Captcha Input ============================
@@ -246,14 +256,22 @@ class MainFrame(wx.Frame):
         if not success:
             self.label_warn_submit.SetForegroundColour(self._color_red_)
             self.label_warn_submit.SetLabel("Please correct above errors!")
+            self._refresh_captcha_()
         else:
             self.label_warn_submit.SetForegroundColour(self._color_green_)
             self.label_warn_submit.SetLabel("Successfully Registered")
             self.registered_frame.Show()
             self.Hide()
 
+    def on_audio_captcha_click(self, _):
+        self._captcha_.play()
+
     def on_refresh_captcha_click(self, _):
         self._refresh_captcha_()
+
+    def on_exit(self, evt):
+        self.registered_frame.Destroy()
+        self.Destroy()
 
     def _refresh_captcha_(self):
         png = self._captcha_.random()
@@ -280,23 +298,20 @@ class MainFrame(wx.Frame):
         st.SetMinSize((150, -1))
         return st
 
-    @staticmethod
-    def _png_to_bitmap_(path: str, size: tuple = None) -> wx.Bitmap:
+    def _png_to_bitmap_(self, path: str, size: tuple = None) -> wx.Bitmap:
         png = Image.open(path)
         if size:
             png = png.resize(size)
 
-
         pix = np.array(png)
-        font_color = wx.Button().GetForegroundColour()[:3]
-    
-        pix_data = np.array([[[*font_color, pix[-1]] if pix[-1] > 0 else pix for pix in row ] for row in pix], dtype=np.uint8)
-
-
-        png = Image.fromarray(pix)
-
-        bg = wx.Button().GetBackgroundColour()
+        font_color = self.button_submit.GetForegroundColour()[:3]
+        bg = self.button_submit.GetBackgroundColour()
         bg = bg[:3]
+
+        pix_data = np.array([[[*font_color, pix[-1]] if pix[-1] > 0 else pix for pix in row] for row in pix],
+                            dtype=np.uint8)
+
+        png = Image.fromarray(pix_data)
 
         img = Image.new("RGB", png.size, bg)
         img.paste(png, mask=png.split()[3])
@@ -309,3 +324,5 @@ class MainFrame(wx.Frame):
         label.SetForegroundColour((255, 0, 0, 255))
         label.SetMinSize((200, 24))
         return label
+
+

@@ -6,3 +6,4 @@ if __name__ == "__main__":
     frm = MainFrame(None, title='Captcha Verifier')
     frm.Show()
     app.MainLoop()
+pass
